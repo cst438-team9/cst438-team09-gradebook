@@ -5,11 +5,12 @@ import java.sql.Date;
  * Data Transfer Object for assignment data including student's grade
  */
 public record AssignmentStudentDTO(
-        int assignmentId,
+        Integer assignmentId,
         String title,
-        Date dueDate,
+        //Date dueDate,
+        String dueDate,
         String courseId,
-        int sectionId,
+        Integer sectionId,
         Integer score
 ) {
 }

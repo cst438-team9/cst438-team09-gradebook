@@ -12,6 +12,6 @@ public record CourseDTO(
 
         String courseId,
         String title,
-        int credits
+        Integer credits
 ) {
 }
