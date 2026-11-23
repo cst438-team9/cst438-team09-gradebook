@@ -5,6 +5,7 @@ import com.cst438.dto.AssignmentDTO;
 import com.cst438.dto.AssignmentStudentDTO;
 import com.cst438.dto.SectionDTO;
 import jakarta.validation.Valid;
+import java.util.Comparator;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -76,7 +77,7 @@ public class AssignmentController {
         // verify that user is the instructor for the section
       Section section = sectionRepository.findById(secNo).orElse(null);
       if( section == null || !section.getInstructorEmail().equals(principal.getName()) ) {
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "you do not have access");
       }
         //  return list of assignments for the Section
       List<Assignment> assignments = section.getAssignments();
@@ -130,25 +131,26 @@ public class AssignmentController {
     @PreAuthorize("hasAuthority('SCOPE_ROLE_INSTRUCTOR')")
     public AssignmentDTO updateAssignment(@Valid @RequestBody AssignmentDTO dto, Principal principal) {
         //  update Assignment Entity.  only title and dueDate fields can be changed.
-      //  user must be instructor of the Section
+      //get assignment to be updated
       Assignment assignment = assignmentRepository.findById(dto.id()).orElse(null);
       if(assignment == null) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Assignment not found");
       }
+      //  user must be instructor of the Section
       Section section = assignment.getSection();
       if(section == null || !principal.getName().equals(section.getInstructorEmail())) {
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "you do not have access");
       }
-
+    // validate due date
       Date dueDate = Date.valueOf(dto.dueDate());
       if(dueDate.before(section.getTerm().getStartDate()) || dueDate.after(section.getTerm().getEndDate())) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Due Date must be between start and end date");
       }
-
+      // update assignment
       assignment.setTitle(dto.title());
       assignment.setDueDate(dueDate);
       assignmentRepository.save(assignment);
-
+      //return update assignment
       return new AssignmentDTO(
           assignment.getAssignmentId(),
           assignment.getTitle(),
@@ -170,7 +172,7 @@ public class AssignmentController {
       }
       Section section = assignment.getSection();
       if(section == null || !principal.getName().equals(section.getInstructorEmail())) {
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "you do not have access");
       }
         // delete the Assignment entity
       assignmentRepository.deleteById(assignmentId);
@@ -189,6 +191,21 @@ public class AssignmentController {
 		//  Grade entity exists.
 		//  hint: use the GradeRepository findByStudentEmailAndAssignmentId
         //  If assignment has not been graded, return a null score.
-        return null;
+      // get list of student assignments
+      List<Assignment> assignments  = assignmentRepository.findByStudentEmailAndYearAndSemester(principal.getName(), year, semester);
+
+      //  return list of assignments for the student
+      return assignments.stream().sorted(Comparator.comparing(Assignment::getDueDate)).map(assignment -> {
+        Grade grade = gradeRepository.findByStudentEmailAndAssignmentId(principal.getName(), assignment.getAssignmentId());
+
+        return new AssignmentStudentDTO(
+            assignment.getAssignmentId(),
+            assignment.getTitle(),
+            assignment.getDueDate().toString(),
+            assignment.getSection().getCourse().getCourseId(),
+            assignment.getSection().getSectionId(),
+            grade == null? null : grade.getScore()
+        );
+      }).toList();
     }
 }
