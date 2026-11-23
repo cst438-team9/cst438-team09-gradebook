@@ -98,11 +98,31 @@ public class AssignmentController {
             Principal principal) {
         
         //  user must be the instructor for the Section
+      Section section = sectionRepository.findById(dto.secNo()).orElse(null);
+      if(section == null || !principal.getName().equals(section.getInstructorEmail())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+      }
 		//  check that assignment dueDate is between start date and 
 		//  end date of the term
+      Date dueDate = Date.valueOf(dto.dueDate());
+      if(dueDate.before(section.getTerm().getStartDate()) || dueDate.after(section.getTerm().getEndDate())) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Due Date must be between start and end date");
+      }
 		//  create and save an Assignment entity
+      Assignment assignment = new Assignment();
+      assignment.setSection(section);
+      assignment.setDueDate(dueDate);
+      assignment.setTitle(dto.title());
+      assignmentRepository.save(assignment);
         //  return AssignmentDTO with database generated primary key
-        return null;
+        return new AssignmentDTO(
+            assignment.getAssignmentId(),
+            assignment.getTitle(),
+            assignment.getDueDate().toString(),
+            assignment.getSection().getCourse().getCourseId(),
+            assignment.getSection().getSectionId(),
+            assignment.getSection().getSectionNo()
+        );
     }
 
 
@@ -110,8 +130,33 @@ public class AssignmentController {
     @PreAuthorize("hasAuthority('SCOPE_ROLE_INSTRUCTOR')")
     public AssignmentDTO updateAssignment(@Valid @RequestBody AssignmentDTO dto, Principal principal) {
         //  update Assignment Entity.  only title and dueDate fields can be changed.
-        //  user must be instructor of the Section
-        return null;
+      //  user must be instructor of the Section
+      Assignment assignment = assignmentRepository.findById(dto.id()).orElse(null);
+      if(assignment == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Assignment not found");
+      }
+      Section section = assignment.getSection();
+      if(section == null || !principal.getName().equals(section.getInstructorEmail())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+      }
+
+      Date dueDate = Date.valueOf(dto.dueDate());
+      if(dueDate.before(section.getTerm().getStartDate()) || dueDate.after(section.getTerm().getEndDate())) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Due Date must be between start and end date");
+      }
+
+      assignment.setTitle(dto.title());
+      assignment.setDueDate(dueDate);
+      assignmentRepository.save(assignment);
+
+      return new AssignmentDTO(
+          assignment.getAssignmentId(),
+          assignment.getTitle(),
+          assignment.getDueDate().toString(),
+          assignment.getSection().getCourse().getCourseId(),
+          assignment.getSection().getSectionId(),
+          assignment.getSection().getSectionNo()
+      );
     }
 
 
@@ -119,7 +164,16 @@ public class AssignmentController {
     @PreAuthorize("hasAuthority('SCOPE_ROLE_INSTRUCTOR')")
     public void deleteAssignment(@PathVariable("assignmentId") int assignmentId, Principal principal) {
         // verify that user is the instructor of the section
+      Assignment assignment = assignmentRepository.findById(assignmentId).orElse(null);
+      if(assignment == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Assignment not found");
+      }
+      Section section = assignment.getSection();
+      if(section == null || !principal.getName().equals(section.getInstructorEmail())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+      }
         // delete the Assignment entity
+      assignmentRepository.deleteById(assignmentId);
         
     }
 
