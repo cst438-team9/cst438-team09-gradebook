@@ -76,7 +76,9 @@ public class AssignmentController {
 
         // verify that user is the instructor for the section
       Section section = sectionRepository.findById(secNo).orElse(null);
-      if( section == null || !section.getInstructorEmail().equals(principal.getName()) ) {
+      if(section == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "section does not exist");
+      } else if (!principal.getName().equals(section.getInstructorEmail())){
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "you do not have access");
       }
         //  return list of assignments for the Section
@@ -100,8 +102,10 @@ public class AssignmentController {
         
         //  user must be the instructor for the Section
       Section section = sectionRepository.findById(dto.secNo()).orElse(null);
-      if(section == null || !principal.getName().equals(section.getInstructorEmail())) {
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+      if(section == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "section does not exist");
+      } else if (!principal.getName().equals(section.getInstructorEmail())){
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "you do not have access");
       }
 		//  check that assignment dueDate is between start date and 
 		//  end date of the term
