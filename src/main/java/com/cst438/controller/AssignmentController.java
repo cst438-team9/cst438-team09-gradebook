@@ -49,7 +49,21 @@ public class AssignmentController {
             Principal principal)  {
         // return the Sections that have instructorEmail for the 
 		// logged in instructor user for the given term.
-        return null;
+      User u = userRepository.findByEmail(principal.getName());
+      List <Section> sections = sectionRepository.findByInstructorEmailAndYearAndSemester(principal.getName(), year, semester);
+      return sections.stream().map((section) -> new SectionDTO(
+          section.getSectionNo(),
+          section.getTerm().getYear(),
+          section.getTerm().getSemester(),
+          section.getCourse().getCourseId(),
+          section.getCourse().getTitle(),
+          section.getSectionId(),
+          section.getBuilding(),
+          section.getRoom(),
+          section.getTimes(),
+          u.getName(),
+          section.getInstructorEmail()
+      )).toList();
     }
 
     // instructor lists assignments for a section.
@@ -60,8 +74,20 @@ public class AssignmentController {
             Principal principal) {
 
         // verify that user is the instructor for the section
+      Section section = sectionRepository.findById(secNo).orElse(null);
+      if( section == null || !section.getInstructorEmail().equals(principal.getName()) ) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+      }
         //  return list of assignments for the Section
-        return null;
+      List<Assignment> assignments = section.getAssignments();
+      return assignments.stream().map((assignment -> new AssignmentDTO(
+          assignment.getAssignmentId(),
+          assignment.getTitle(),
+          assignment.getDueDate().toString(),
+          assignment.getSection().getCourse().getCourseId(),
+          assignment.getSection().getSectionId(),
+          assignment.getSection().getSectionNo()
+      ))).toList();
     }
 
 
