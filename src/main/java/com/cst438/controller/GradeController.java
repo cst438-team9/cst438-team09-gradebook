@@ -10,6 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.ArrayList;
 
 @RestController
 public class GradeController {
@@ -26,22 +27,59 @@ public class GradeController {
     @PreAuthorize("hasAuthority('SCOPE_ROLE_INSTRUCTOR')")
     @GetMapping("/assignments/{assignmentId}/grades")
     public List<GradeDTO> getAssignmentGrades(@PathVariable("assignmentId") int assignmentId, Principal principal) {
-		// Check that the Section of the assignment belongs to the 
-		// logged in instructor 
-        // return a list of GradeDTOs containing student scores for an assignment
-        // if a Grade entity does not exist, then create the Grade entity 
-		// with a null score and return the gradeId. 
-        return null;
+        Assignment assignment = assignmentRepository.findById(assignmentId).orElse(null);
+        if (assignment == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "assignment not found");
+        }
+        Section section = assignment.getSection();
+        if (!principal.getName().equals(section.getInstructorEmail())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not the instructor for this section");
+        }
+        List<GradeDTO> result = new ArrayList<>();
+        for (Enrollment enrollment : section.getEnrollments()) {
+            User student = enrollment.getStudent();
+            Grade grade = gradeRepository.findByStudentEmailAndAssignmentId(student.getEmail(), assignmentId);
+            if (grade == null) {
+                // an ungraded assignment needs an id but should not show a zero
+                grade = new Grade();
+                grade.setAssignment(assignment);
+                grade.setEnrollment(enrollment);
+                grade.setScore(null);
+                grade = gradeRepository.save(grade);
+            }
+            result.add(new GradeDTO(grade.getGradeId(), student.getName(), student.getEmail(),
+                    assignment.getTitle(), section.getCourse().getCourseId(),
+                    section.getSectionId(), grade.getScore()));
+        }
+        return result;
     }
 
 
     @PutMapping("/grades")
     @PreAuthorize("hasAuthority('SCOPE_ROLE_INSTRUCTOR')")
     public void updateGrades(@Valid @RequestBody List<GradeDTO> dtoList, Principal principal) {
-		// for each GradeDTO
-		// check that the logged in instructor is the owner of the section
-        // update the assignment score
-        
-        
+        List<Grade> grades = new ArrayList<>();
+        for (GradeDTO dto : dtoList) {
+            if (dto == null || dto.gradeId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "grade id is required");
+            }
+            Grade grade = gradeRepository.findById(dto.gradeId()).orElse(null);
+            if (grade == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "grade not found");
+            }
+            if (!principal.getName().equals(grade.getAssignment().getSection().getInstructorEmail())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not the instructor for this section");
+            }
+            if (dto.score() != null && (dto.score() < 0 || dto.score() > 100)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "score must be between 0 and 100");
+            }
+            grades.add(grade);
+        }
+        // assignment scores stay in gradebook, only final course grades go to registrar
+        for (int i = 0; i < dtoList.size(); i++) {
+            Grade grade = grades.get(i);
+            grade.setScore(dtoList.get(i).score());
+            gradeRepository.save(grade);
+        }
     }
 }

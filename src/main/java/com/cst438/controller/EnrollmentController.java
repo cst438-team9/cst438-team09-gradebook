@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.security.Principal;
 
 import java.util.List;
+import java.util.ArrayList;
 
 @RestController
 public class EnrollmentController {
@@ -36,24 +37,58 @@ public class EnrollmentController {
     @GetMapping("/sections/{sectionNo}/enrollments")
     public List<EnrollmentDTO> getEnrollments(
             @PathVariable("sectionNo") int sectionNo, Principal principal ) {
-				
-		// check that the sectionNo belongs to the logged in instructor.
-		
-		// use the EnrollmentRepository findEnrollmentsBySectionNoOrderByStudentName
-		// to get a list of Enrollments for the given sectionNo.
-		// Return a list of EnrollmentDTOs
-
-        return null;
+        Section section = sectionRepository.findById(sectionNo).orElse(null);
+        if (section == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "section not found");
+        }
+        if (!principal.getName().equals(section.getInstructorEmail())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not the instructor for this section");
+        }
+        List<EnrollmentDTO> result = new ArrayList<>();
+        for (Enrollment enrollment : enrollmentRepository.findEnrollmentsBySectionNoOrderByStudentName(sectionNo)) {
+            result.add(toDTO(enrollment));
+        }
+        return result;
     }
 
     // instructor updates enrollment grades
     @PreAuthorize("hasAuthority('SCOPE_ROLE_INSTRUCTOR')")
     @PutMapping("/enrollments")
     public void updateEnrollmentGrade(@Valid @RequestBody List<EnrollmentDTO> dtoList, Principal principal) {
-		// for each EnrollmentDTO 
-        //    check that logged in user is instructor for the section
-        //    update the enrollment grade
-        //    send message to Registrar service for grade update
-       
+        // check the whole list before saving anything or sending messages
+        List<Enrollment> enrollments = new ArrayList<>();
+        for (EnrollmentDTO dto : dtoList) {
+            if (dto == null || dto.enrollmentId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "enrollment id is required");
+            }
+            Enrollment enrollment = enrollmentRepository.findById(dto.enrollmentId()).orElse(null);
+            if (enrollment == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "enrollment not found");
+            }
+            if (!principal.getName().equals(enrollment.getSection().getInstructorEmail())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not the instructor for this section");
+            }
+            if (dto.grade() != null && dto.grade().length() > 5) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "grade must be at most 5 characters");
+            }
+            enrollments.add(enrollment);
+        }
+        for (int i = 0; i < dtoList.size(); i++) {
+            Enrollment enrollment = enrollments.get(i);
+            enrollment.setGrade(dtoList.get(i).grade());
+            enrollmentRepository.save(enrollment);
+            registrar.sendMessage("updateEnrollment", toDTO(enrollment));
+        }
+    }
+
+    private EnrollmentDTO toDTO(Enrollment enrollment) {
+        Section section = enrollment.getSection();
+        User student = enrollment.getStudent();
+        return new EnrollmentDTO(enrollment.getEnrollmentId(), enrollment.getGrade(),
+                student.getId(), student.getName(), student.getEmail(),
+                section.getCourse().getCourseId(), section.getCourse().getTitle(),
+                section.getSectionId(), section.getSectionNo(), section.getBuilding(),
+                section.getRoom(), section.getTimes(), section.getCourse().getCredits(),
+                section.getTerm().getYear(), section.getTerm().getSemester());
     }
 }
