@@ -7,6 +7,7 @@ import com.cst438.dto.LoginDTO;
 import com.cst438.service.RegistrarServiceProxy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
@@ -19,7 +20,6 @@ import java.sql.Date;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -118,7 +118,10 @@ public class EnrollmentGradeControllerUnitTest {
         put("/enrollments", List.of(enrollmentDTO(90001, "A")))
                 .expectStatus().isOk();
         assertEquals("A", enrollments.findById(90001).orElseThrow().getGrade());
-        verify(registrar, times(1)).sendMessage(eq("updateEnrollment"), any());
+        ArgumentCaptor<EnrollmentDTO> sentEnrollment = ArgumentCaptor.forClass(EnrollmentDTO.class);
+        verify(registrar, times(1)).sendMessage(eq("updateEnrollment"), sentEnrollment.capture());
+        assertEquals(90001, sentEnrollment.getValue().enrollmentId());
+        assertEquals("A", sentEnrollment.getValue().grade());
     }
 
     @Test
@@ -128,7 +131,10 @@ public class EnrollmentGradeControllerUnitTest {
         enrollments.save(enrollment);
         put("/enrollments", List.of(enrollmentDTO(90001, null))).expectStatus().isOk();
         assertNull(enrollments.findById(90001).orElseThrow().getGrade());
-        verify(registrar, times(1)).sendMessage(eq("updateEnrollment"), any());
+        ArgumentCaptor<EnrollmentDTO> sentEnrollment = ArgumentCaptor.forClass(EnrollmentDTO.class);
+        verify(registrar, times(1)).sendMessage(eq("updateEnrollment"), sentEnrollment.capture());
+        assertEquals(90001, sentEnrollment.getValue().enrollmentId());
+        assertNull(sentEnrollment.getValue().grade());
     }
 
     @Test
