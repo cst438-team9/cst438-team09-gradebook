@@ -101,7 +101,7 @@ public class AssignmentController {
             Principal principal) {
       //Verify section number is provided
       if (dto.secNo() == null) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Section number missing required");
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Section number missing");
       }
       //  user must be the instructor for the Section
       Section section = sectionRepository.findById(dto.secNo()).orElse(null);
@@ -145,7 +145,7 @@ public class AssignmentController {
     public AssignmentDTO updateAssignment(@Valid @RequestBody AssignmentDTO dto, Principal principal) {
       //verify assignment id is provided
       if (dto.id() == null) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Assignment number missing");
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Assignment ID missing");
       }
       //  update Assignment Entity.  only title and dueDate fields can be changed.
       //get assignment to be updated
