@@ -159,7 +159,7 @@ public class AssignmentControllerUnitTest {
     //invalid section is sent
     assignmentDTO = new AssignmentDTO(
         0, //key automatically generated
-        "First Assignment$$", //Title
+        "First Assignment", //Title
         "2026-11-22", //dueDate
         section.getCourse().getCourseId(),  //course ID
         section.getSectionId(), //section ID
